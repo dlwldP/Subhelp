@@ -1,0 +1,19 @@
+// 공통 빌드 변수.
+// ⚠️ 여기 값은 커밋되는 기본값(플레이스홀더)이다. 실제 값은 Config/Local.xcconfig에 적는다. (git 무시됨)
+//    cp Config/Local.xcconfig.example Config/Local.xcconfig
+
+// Apple Developer 팀 ID (Xcode > Settings > Accounts 또는 developer.apple.com > Membership)
+DEVELOPMENT_TEAM =
+
+// 번들 ID 접두사 → 앱: <prefix>.subtracker / 위젯: <prefix>.subtracker.widget
+BUNDLE_ID_PREFIX = com.yourname
+
+// App Group (앱 + 위젯이 SwiftData 저장소와 설정을 공유)
+APP_GROUP_ID = group.$(BUNDLE_ID_PREFIX).subtracker
+
+// 설정 > 앱 정보에 노출. 비워두면 해당 항목이 숨겨진다.
+// xcconfig에서 `//`는 주석이므로 URL은 https:/$()/example.com 형태로 적는다.
+SUPPORT_EMAIL =
+PRIVACY_POLICY_URL =
+
+#include? "Local.xcconfig"
