@@ -16,4 +16,9 @@ APP_GROUP_ID = group.$(BUNDLE_ID_PREFIX).subhelp
 SUPPORT_EMAIL =
 PRIVACY_POLICY_URL =
 
+// Supabase (Project Settings > API). 비워두면 로그인·동기화·원격 프리셋이 꺼지고 기기 저장만으로 동작한다.
+// anon key는 앱에 들어가도 되는 공개 키다 (RLS로 보호). service_role 키는 절대 여기에 넣지 않는다.
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+
 #include? "Local.xcconfig"

@@ -7,6 +7,9 @@ enum AppConfig {
     static let appGroupID: String? = infoValue("AppGroupIdentifier")
     static let supportEmail: String? = infoValue("SupportEmail")
     static let privacyPolicyURL: URL? = infoValue("PrivacyPolicyURL").flatMap(URL.init(string:))
+    /// Supabase 설정 — 둘 중 하나라도 비어 있으면 서버 기능을 끈다
+    static let supabaseURL: URL? = infoValue("SupabaseURL").flatMap(URL.init(string:))
+    static let supabaseAnonKey: String? = infoValue("SupabaseAnonKey")
 
     static var appVersion: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-"

@@ -19,6 +19,8 @@ final class Subscription {
     var trialEndDate: Date? = nil
     var memo: String = ""
     var createdAt: Date = Date.now
+    /// 마지막 수정 시각 — 서버 동기화에서 어느 쪽이 최신인지 판단한다 (밀리초 단위)
+    var updatedAt: Date = Date.now
 
     var cycle: BillingCycle {
         get { BillingCycle(rawValue: cycleRaw) ?? .monthly }
@@ -33,6 +35,11 @@ final class Subscription {
     var plan: BillingPlan {
         BillingPlan(price: price, currency: currency, cycle: cycle,
                     interval: cycleInterval, startDate: startDate, trialEndDate: trialEndDate)
+    }
+
+    /// 사용자가 수정했음을 표시 — 수정하는 모든 곳에서 호출한다
+    func touch() {
+        updatedAt = Date.now.truncatedToMilliseconds
     }
 
     init(name: String, price: Decimal, cycle: BillingCycle, startDate: Date) {

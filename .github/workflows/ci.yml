@@ -42,6 +42,8 @@ jobs:
             -project Subhelp.xcodeproj \
             -scheme Subhelp \
             -destination "id=$DEVICE_ID" \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO \
             | tee xcodebuild.log | grep -E "error:|warning: .*Subhelp|Test (Suite|Case)|✔|✘|\*\* (BUILD|TEST)" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" xcodebuild.log || { tail -150 xcodebuild.log; exit 1; }

@@ -8,6 +8,11 @@ options:
   createIntermediateGroups: true
   developmentLanguage: ko
 
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: "2.5.0"
+
 configFiles:
   Debug: Config/Base.xcconfig
   Release: Config/Base.xcconfig
@@ -45,6 +50,8 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     dependencies:
       - target: SubhelpWidget
+      - package: Supabase
+        product: Supabase
     scheme:
       testTargets:
         - SubhelpTests

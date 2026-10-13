@@ -136,13 +136,13 @@ struct SubscriptionDetailView: View {
     }
 
     private func toggleActive(_ sub: Subscription) {
-        sub.isActive.toggle()
+        SubscriptionSync.setActive(!sub.isActive, for: sub)
         Task { await SubscriptionSync.commit(context) }
     }
 
     private func delete(_ sub: Subscription) {
         dismiss()
-        context.delete(sub)
+        SubscriptionSync.delete(sub, in: context)
         Task { await SubscriptionSync.commit(context) }
     }
 }

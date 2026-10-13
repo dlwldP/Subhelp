@@ -69,6 +69,7 @@ final class SubscriptionDraft {
         sub.isActive = isActive
         sub.trialEndDate = hasTrial ? Calendar.current.startOfDay(for: trialEndDate) : nil
         sub.memo = memo.trimmingCharacters(in: .whitespacesAndNewlines)
+        sub.touch()
     }
 
     func makeSubscription() -> Subscription {

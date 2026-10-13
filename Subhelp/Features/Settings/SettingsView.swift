@@ -59,6 +59,8 @@ struct SettingsView: View {
                     Text("알림 시점은 새 구독을 추가할 때의 기본값이에요. 알림 시각은 모든 구독에 적용돼요.")
                 }
 
+                AccountSection()
+
                 Section {
                     LabeledContent("버전", value: AppConfig.appVersion)
                     if let email = AppConfig.supportEmail, let url = URL(string: "mailto:\(email)") {
@@ -70,7 +72,9 @@ struct SettingsView: View {
                 } header: {
                     Text("정보")
                 } footer: {
-                    Text("모든 데이터는 이 기기에만 저장되고 어디에도 전송되지 않아요. 앱을 삭제하면 등록한 구독도 함께 삭제되니 주의해주세요.")
+                    Text(AccountService.shared.isSignedIn
+                         ? "구독 목록은 이 기기와 서버(로그인한 계정)에 저장돼요."
+                         : "로그인하지 않으면 모든 데이터는 이 기기에만 저장되고 어디에도 전송되지 않아요. 앱을 삭제하면 등록한 구독도 함께 삭제되니 주의해주세요.")
                 }
             }
             .navigationTitle("설정")

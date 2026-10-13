@@ -10,9 +10,8 @@ struct AddSubscriptionSheet: View {
     private var query: String { searchText.trimmingCharacters(in: .whitespaces) }
 
     private var sections: [PresetSection] {
-        let presets = query.isEmpty
-            ? SubscriptionPreset.all
-            : SubscriptionPreset.all.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        let all = PresetStore.shared.presets
+        let presets = query.isEmpty ? all : all.filter { $0.name.localizedCaseInsensitiveContains(query) }
         return SubscriptionPreset.grouped(presets)
     }
 

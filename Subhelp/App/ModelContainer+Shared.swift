@@ -7,7 +7,7 @@ enum SharedModelContainer {
     static let shared: ModelContainer = makeContainer()
 
     private static func makeContainer() -> ModelContainer {
-        let schema = Schema([Subscription.self])
+        let schema = Schema([Subscription.self, DeletionTombstone.self])
 
         if let groupID = AppConfig.appGroupID {
             let config = ModelConfiguration(schema: schema, groupContainer: .identifier(groupID))

@@ -102,12 +102,15 @@ struct RootView: View {
             Task {
                 await router.refreshNotificationStatus()
                 await SubscriptionSync.refresh(using: context)
+                AccountService.shared.requestSync()
             }
         }
         .task {
             // 첫 실행 시점에는 scenePhase 변경이 오지 않을 수 있어 직접 한 번 갱신한다
+            AccountService.shared.start()
             await router.refreshNotificationStatus()
             await SubscriptionSync.refresh(using: context)
+            await PresetStore.shared.refresh()
             await requestReviewIfNeeded()
         }
     }

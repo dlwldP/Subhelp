@@ -149,17 +149,17 @@ struct SubscriptionListView: View {
     }
 
     private func delete(_ subscription: Subscription) {
-        context.delete(subscription)
+        SubscriptionSync.delete(subscription, in: context)
         Task { await SubscriptionSync.commit(context) }
     }
 
     private func pause(_ subscription: Subscription) {
-        subscription.isActive = false
+        SubscriptionSync.setActive(false, for: subscription)
         Task { await SubscriptionSync.commit(context) }
     }
 
     private func toggleActive(_ subscription: Subscription) {
-        subscription.isActive.toggle()
+        SubscriptionSync.setActive(!subscription.isActive, for: subscription)
         Task { await SubscriptionSync.commit(context) }
     }
 }

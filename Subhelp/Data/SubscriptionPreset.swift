@@ -8,7 +8,7 @@ enum SubscriptionCategory {
 /// 추가 화면의 프리셋 — 이름, 카테고리, 대표 색상만 제공한다.
 /// - 브랜드 로고는 쓰지 않는다 (상표 문제) → 이니셜 + 색상 원형 아이콘
 /// - 가격은 넣지 않는다 (요금 변경이 잦고 요금제마다 다름) → 사용자가 입력
-struct SubscriptionPreset: Identifiable, Hashable {
+struct SubscriptionPreset: Identifiable, Hashable, Codable {
     var id: String { name }
     let name: String
     let category: String
