@@ -61,6 +61,9 @@ struct RootView: View {
             SubscriptionListView()
                 .tabItem { Label("구독", systemImage: "list.bullet.rectangle") }
                 .tag(AppRouter.Tab.subscriptions)
+            StatsView()
+                .tabItem { Label("통계", systemImage: "chart.pie") }
+                .tag(AppRouter.Tab.stats)
             SettingsView()
                 .tabItem { Label("설정", systemImage: "gearshape") }
                 .tag(AppRouter.Tab.settings)

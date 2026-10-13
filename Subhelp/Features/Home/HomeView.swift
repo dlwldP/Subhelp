@@ -1,4 +1,3 @@
-import Charts
 import SwiftData
 import SwiftUI
 import UIKit
@@ -39,13 +38,13 @@ struct HomeView: View {
             .sorted { $0.date < $1.date }
     }
 
-    private var categoryTotals: [CategoryTotal] {
-        Dictionary(grouping: subscriptions.filter { !billing.isInTrial($0.plan) }, by: \.category)
-            .map { category, subs in
-                CategoryTotal(category: category,
-                              amount: subs.reduce(Decimal(0)) { $0 + cost.monthlyCost($1.plan) }.doubleValue)
-            }
-            .sorted { $0.amount > $1.amount }
+    /// 30일 이내 연간 갱신 (I-04)
+    private var renewals: [UpcomingItem] {
+        let insight = InsightCalculator(billing: billing, cost: cost)
+        return insight.upcomingRenewals(of: subscriptions.map(\.plan)).map { payment in
+            UpcomingItem(subscription: subscriptions[payment.planIndex], date: payment.date,
+                         days: billing.daysUntil(payment.date))
+        }
     }
 
     private var monthTitle: String {
@@ -72,8 +71,8 @@ struct HomeView: View {
                             if router.isNotificationDenied { NotificationDeniedBanner() }
                             summaryCard
                             upcomingCard
+                            if !renewals.isEmpty { renewalCard }
                             if !trials.isEmpty { trialCard }
-                            if !categoryTotals.isEmpty { categoryCard }
                         }
                         .padding()
                     }
@@ -188,24 +187,41 @@ struct HomeView: View {
         }
     }
 
-    private var categoryCard: some View {
+    private var renewalCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
-                Text("카테고리별 지출 (월 환산)")
+                Label("곧 갱신되는 연간 결제", systemImage: "calendar.badge.exclamationmark")
                     .font(.headline)
-                Chart(categoryTotals) { item in
-                    SectorMark(angle: .value("금액", item.amount), innerRadius: .ratio(0.6), angularInset: 1.5)
-                        .cornerRadius(4)
-                        .foregroundStyle(by: .value("카테고리", item.category))
-                }
-                .frame(height: 200)
-                .chartLegend(position: .bottom, spacing: 12)
-                if let top = categoryTotals.first {
-                    Text("가장 큰 지출은 \(top.category)이에요")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                Text("한 번에 큰 금액이 나가요. 계속 쓸지 미리 확인해보세요.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                ForEach(renewals) { item in
+                    NavigationLink(value: item.subscription.id) {
+                        HStack(spacing: 12) {
+                            InitialIcon(name: item.subscription.name, colorHex: item.subscription.colorHex, size: 32)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.subscription.name)
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                Text("\(item.date.formatted(.dateTime.month().day())) 갱신 · \(item.subscription.price.currencyText(item.subscription.currency))")
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            DDayBadge(days: item.days)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(SubscriptionAccessibility.label(item.subscription, days: item.days) + ", 연간 갱신")
                 }
             }
+        }
+        .overlay(alignment: .leading) {
+            UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 16)
+                .fill(Color.orange)
+                .frame(width: 4)
         }
     }
 }
@@ -239,12 +255,6 @@ private struct UpcomingRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(SubscriptionAccessibility.label(item.subscription, days: item.days))
     }
-}
-
-private struct CategoryTotal: Identifiable {
-    let category: String
-    let amount: Double
-    var id: String { category }
 }
 
 private struct StatView: View {

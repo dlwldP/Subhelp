@@ -9,12 +9,13 @@ final class AppRouter {
     static let shared = AppRouter()
 
     enum Tab: Hashable {
-        case home, subscriptions, settings
+        case home, subscriptions, stats, settings
     }
 
     var selectedTab: Tab = .home
     var homePath: [UUID] = []
     var subscriptionsPath: [UUID] = []
+    var statsPath: [UUID] = []
 
     /// [+] 구독 추가 — 모든 탭에서 같은 시트를 띄운다
     var isAddingSubscription = false
