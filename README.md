@@ -160,54 +160,6 @@ xcodebuild test -project Subhelp.xcodeproj -scheme Subhelp \
 
 테스트 타깃은 앱을 호스트로 띄우지 않고 `Domain/` 소스를 직접 컴파일한다 (서명·App Group 없이 실행 가능). GitHub Actions(`.github/workflows/ci.yml`)에서 앱·위젯 빌드와 테스트, Edge Function 타입 체크(`deno check`·`lint`·`fmt`)를 자동 실행한다.
 
-## 출시 전 체크리스트
-
-### 1. 계정·포털 준비
-- [ ] Apple Developer Program 가입 (연 $99)
-- [ ] Identifiers > **App Groups**: `group.<prefix>.subhelp` 생성
-- [ ] Identifiers > **App ID** 2개: 앱 `<prefix>.subhelp`, 위젯 `<prefix>.subhelp.widget`
-  - [ ] 두 App ID 모두 **App Groups** 체크 후 위 그룹 연결
-  - [ ] 앱 App ID에만 **Sign in with Apple** 체크
-- [ ] Keys > Sign in with Apple 키 발급 (`.p8`, Key ID) — Edge Function용
-
-### 2. 프로젝트 설정
-- [ ] `brew install xcodegen`
-- [ ] `cp Config/Local.xcconfig.example Config/Local.xcconfig` 후 값 채우기
-  - [ ] `DEVELOPMENT_TEAM`, `BUNDLE_ID_PREFIX`, `APP_GROUP_ID`
-  - [ ] `SUPPORT_EMAIL`, `PRIVACY_POLICY_URL`
-  - [ ] `SUPABASE_URL`, `SUPABASE_ANON_KEY`
-- [ ] `xcodegen generate` (`project.yml`이 바뀔 때마다 다시 실행, 첫 실행 시 Supabase 패키지 다운로드)
-- [ ] 앱 아이콘 1024px (+ 다크/틴트 변형) → `Subhelp/Resources/Assets.xcassets/AppIcon` — **없으면 업로드가 거절된다**
-
-### 3. Supabase
-- [ ] 프로젝트 생성, SQL Editor에서 `supabase/migrations/0001_init.sql` 실행
-- [ ] Authentication > Providers > Apple 활성화, Client IDs에 앱 번들 ID
-- [ ] Edge Function Secrets 등록 + `supabase functions deploy delete-account` (위 섹션)
-
-### 4. 개인정보
-- [ ] 개인정보처리방침 페이지 작성·공개 (Notion 공개 페이지 / GitHub Pages) → URL을 `PRIVACY_POLICY_URL`에
-  - [ ] 로그인 시 Supabase에 저장되는 항목(이메일, 사용자 ID, 구독 정보), 계정 삭제 방법(설정 > 계정·동기화 > 계정 삭제) 기재
-- [ ] App Store Connect 개인정보 라벨: **이메일 주소, 사용자 ID, 기타 금융 정보(구독 금액)** — 사용자와 연결됨, 추적 안 함, 목적: 앱 기능 (`PrivacyInfo.xcprivacy`와 동일)
-
-### 5. 실기기 확인 (CI로 확인할 수 없는 것)
-- [ ] 알림이 설정한 날짜·시각에 오는지, 알림을 탭하면 해당 구독 상세로 가는지
-- [ ] 앱에서 바꾼 내용이 위젯에 바로 반영되는지 (App Group 설정 확인), 위젯 탭 시 해당 화면 이동
-- [ ] 첫 실행 온보딩, 첫 구독 추가 직후 알림 권한 안내, 권한 거부 시 홈 배너
-- [ ] 통계 탭, 결제 캘린더, 목록 정렬·필터
-- [ ] 로그인·동기화: 기기 2대(또는 기기 + 시뮬레이터)에서 추가·수정·삭제가 서로 반영되는지
-- [ ] 로그아웃, 계정 삭제(Apple 재확인 → 삭제 → 함수 로그에서 `appleTokenRevoked: true` 확인)
-- [ ] 다크 모드, 큰 글씨(Dynamic Type)
-
-### 6. TestFlight
-- [ ] App Store Connect에서 같은 번들 ID로 앱 등록
-- [ ] Xcode > Product > Archive > Distribute App > App Store Connect 업로드 (두 번째부터 `project.yml`의 `CURRENT_PROJECT_VERSION` +1)
-- [ ] 내부 테스터 추가 (외부 테스터는 베타 심사 필요), TestFlight 크래시 로그 확인
-
-### 7. App Store 심사 제출
-- [ ] 앱 이름·부제·키워드·설명·카테고리(금융)·연령 등급
-- [ ] 6.9인치 iPhone 스크린샷
-- [ ] 앱 소개에 "각 서비스명은 해당 회사의 상표입니다" 문구
-
 ## 로드맵 (MVP 이후)
 
 1. 인터랙티브 위젯 (App Intents)
