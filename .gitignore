@@ -25,3 +25,9 @@ Config/Local.xcconfig
 
 # macOS
 .DS_Store
+
+# Supabase — 비밀 값과 CLI 임시 파일
+supabase/.temp/
+supabase/.branches/
+supabase/functions/.env
+*.env.local

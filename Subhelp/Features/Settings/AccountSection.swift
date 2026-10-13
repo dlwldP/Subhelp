@@ -6,6 +6,7 @@ struct AccountSection: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var isConfirmingSignOut = false
     @State private var isConfirmingDelete = false
+    @State private var isShowingDeleteSheet = false
 
     private let account = AccountService.shared
 
@@ -70,14 +71,83 @@ struct AccountSection: View {
 
         Button("계정 삭제", role: .destructive) { isConfirmingDelete = true }
             .confirmationDialog("계정을 삭제할까요?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-                Button("계정 삭제", role: .destructive) { Task { _ = await account.deleteAccount() } }
+                Button("계속", role: .destructive) { isShowingDeleteSheet = true }
             } message: {
                 Text("서버에 백업된 구독과 계정 정보가 모두 지워지고 되돌릴 수 없어요. 이 기기의 구독은 남아요.")
+            }
+            .sheet(isPresented: $isShowingDeleteSheet) {
+                DeleteAccountSheet()
             }
     }
 
     private var lastSyncText: String {
         guard let date = account.lastSyncedAt else { return "아직 없음" }
         return date.formatted(.relative(presentation: .named))
+    }
+}
+
+/// 계정 삭제 마지막 단계 — Apple로 한 번 더 확인받아 Apple 로그인 연결(토큰)까지 끊는다
+private struct DeleteAccountSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isDeleting = false
+
+    private let account = AccountService.shared
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 20) {
+                Image(systemName: "person.crop.circle.badge.xmark")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.red)
+                    .accessibilityHidden(true)
+                Text("계정을 삭제하려면 Apple로 한 번 더 확인해주세요")
+                    .font(.title3.bold())
+                Text("확인하면 서버에 백업된 구독과 계정이 삭제되고, 이 앱과 Apple ID의 로그인 연결도 해제돼요. 이 기기에 저장된 구독은 그대로 남아요.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if let message = account.errorMessage {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+
+                Spacer()
+
+                if isDeleting {
+                    HStack {
+                        Spacer()
+                        ProgressView("삭제하는 중…")
+                        Spacer()
+                    }
+                    .frame(height: 50)
+                } else {
+                    SignInWithAppleButton(.continue) { request in
+                        request.requestedScopes = []
+                    } onCompletion: { result in
+                        let outcome = AccountService.authorizationCode(from: result)
+                        guard !outcome.isCanceled else { return }
+                        isDeleting = true
+                        Task {
+                            let deleted = await account.deleteAccount(authorizationCode: outcome.code)
+                            isDeleting = false
+                            if deleted { dismiss() }
+                        }
+                    }
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                    .frame(height: 50)
+                }
+            }
+            .padding(24)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("취소") { dismiss() }
+                        .disabled(isDeleting)
+                }
+            }
+        }
+        .interactiveDismissDisabled(isDeleting)
     }
 }

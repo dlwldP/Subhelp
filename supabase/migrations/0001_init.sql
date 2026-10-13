@@ -75,6 +75,8 @@ create policy "본인 구독 삭제"
 -- ─────────────────────────────────────────────
 -- 3. 계정 삭제 (App Store 가이드라인 5.1.1(v): 앱 안에서 계정 삭제 제공 필수)
 -- 본인 auth.users 행을 지우면 subscriptions는 on delete cascade로 함께 지워진다
+-- 앱은 기본으로 Edge Function `delete-account`(Apple 토큰 철회 포함)를 호출하고,
+-- 함수가 배포되지 않았거나 실패했을 때만 이 함수로 대신 삭제한다 (Apple 토큰 철회는 생략됨)
 -- ─────────────────────────────────────────────
 create or replace function public.delete_account()
 returns void

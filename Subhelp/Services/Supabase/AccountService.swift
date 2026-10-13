@@ -95,18 +95,44 @@ final class AccountService {
         clearLocalAccountState()
     }
 
-    /// 계정 삭제 — 서버의 계정과 백업 데이터를 모두 지운다. 이 기기의 구독은 남는다
-    func deleteAccount() async -> Bool {
+    /// 계정 삭제 — 서버의 계정과 백업 데이터를 모두 지운다. 이 기기의 구독은 남는다.
+    /// `authorizationCode`: 삭제 직전 Apple 재인증으로 받은 코드. Edge Function이 이걸로 Apple 토큰을 철회한다
+    func deleteAccount(authorizationCode: String?) async -> Bool {
         guard let client = SupabaseService.client else { return false }
+        errorMessage = nil
         do {
-            try await client.rpc("delete_account").execute()
-            try? await client.auth.signOut()
-            clearLocalAccountState()
-            return true
+            let response: DeleteAccountResponse = try await client.functions.invoke(
+                "delete-account",
+                options: FunctionInvokeOptions(body: DeleteAccountRequest(authorizationCode: authorizationCode))
+            )
+            if !response.appleTokenRevoked {
+                Logger.app.warning("계정은 삭제됐지만 Apple 토큰 철회는 실패함 (Edge Function 로그 확인)")
+            }
         } catch {
-            Logger.app.error("계정 삭제 실패: \(error.localizedDescription, privacy: .public)")
-            errorMessage = "계정을 삭제하지 못했어요. 네트워크를 확인하고 다시 시도해주세요."
-            return false
+            // Edge Function을 아직 배포하지 않은 경우 등: DB 함수로 계정만 삭제 (Apple 토큰 철회는 생략됨)
+            Logger.app.error("delete-account 함수 호출 실패, DB 함수로 대체: \(error.localizedDescription, privacy: .public)")
+            do {
+                try await client.rpc("delete_account").execute()
+            } catch {
+                Logger.app.error("계정 삭제 실패: \(error.localizedDescription, privacy: .public)")
+                errorMessage = "계정을 삭제하지 못했어요. 네트워크를 확인하고 다시 시도해주세요."
+                return false
+            }
+        }
+        try? await client.auth.signOut()
+        clearLocalAccountState()
+        return true
+    }
+
+    /// 계정 삭제 전 Apple 재인증 결과 → authorizationCode. 사용자가 취소했는지도 함께 돌려준다
+    static func authorizationCode(from result: Result<ASAuthorization, Error>) -> (code: String?, isCanceled: Bool) {
+        switch result {
+        case .success(let authorization):
+            let credential = authorization.credential as? ASAuthorizationAppleIDCredential
+            let code = credential?.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
+            return (code, false)
+        case .failure(let error):
+            return (nil, (error as? ASAuthorizationError)?.code == .canceled)
         }
     }
 
@@ -170,4 +196,13 @@ final class AccountService {
     private static func sha256(_ input: String) -> String {
         SHA256.hash(data: Data(input.utf8)).map { String(format: "%02x", $0) }.joined()
     }
+}
+
+private struct DeleteAccountRequest: Encodable, Sendable {
+    let authorizationCode: String?
+}
+
+private struct DeleteAccountResponse: Decodable, Sendable {
+    let deleted: Bool
+    let appleTokenRevoked: Bool
 }

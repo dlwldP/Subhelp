@@ -65,6 +65,11 @@ open Subhelp.xcodeproj
 | `SUPABASE_URL` | Supabase > Project Settings > API > Project URL (`https:/$()/xxxx.supabase.co`) |
 | `SUPABASE_ANON_KEY` | 같은 화면의 `anon` `public` 키. 앱에 들어가도 되는 공개 키(RLS로 보호). **`service_role` 키는 절대 넣지 않는다** |
 
+- 이 값들은 `Info.plist`(`AppGroupIdentifier` 등)와 entitlements에 주입되고, 코드에서는 `AppConfig`로만 읽는다.
+- App Group이 비어 있으면 앱은 앱 전용 저장소로 동작한다(위젯과 데이터 공유 안 됨).
+- Supabase 값이 비어 있으면 로그인·동기화·원격 프리셋이 숨겨지고 기기 저장만으로 동작한다.
+- 최근 만든 Supabase 프로젝트는 대시보드에서 `anon` 대신 **publishable key**(`sb_publishable_...`)로, 메뉴는 "API Keys"/"Data API"로 보일 수 있다. 같은 용도의 공개 키를 넣으면 된다.
+
 ### Supabase 설정
 
 1. Supabase에서 프로젝트 생성
@@ -73,6 +78,34 @@ open Subhelp.xcodeproj
    (앱 안의 네이티브 Apple 로그인만 쓰므로 Secret Key는 필요 없다)
 4. Apple Developer > Identifiers > 앱 App ID에 **Sign in with Apple** 기능 체크
 5. `Config/Local.xcconfig`에 `SUPABASE_URL`, `SUPABASE_ANON_KEY` 입력 후 `xcodegen generate`
+6. **계정 삭제용 Edge Function 배포** (아래)
+
+### 계정 삭제 Edge Function (`supabase/functions/delete-account`)
+
+Apple 로그인 계정을 삭제할 때는 Apple 토큰도 철회해야 한다(App Store 계정 삭제 요건). 철회에는 Apple 개인 키(.p8)가 필요해서 앱이 아니라 이 함수에 둔다.
+
+- 흐름: 설정 > 계정 삭제 → Apple로 한 번 더 확인(authorizationCode 획득) → 함수가 Apple 토큰 교환·철회 → Supabase 계정 삭제(구독은 cascade 삭제)
+- Apple 철회가 실패해도 계정 삭제는 진행하고 응답의 `appleTokenRevoked`로 알린다 (함수 로그 확인)
+- 함수가 배포되지 않았거나 호출에 실패하면 앱은 DB 함수 `delete_account()`로 계정만 삭제한다 (Apple 철회 생략)
+
+배포:
+
+1. Apple Developer > Keys > **+** → Sign in with Apple 체크, 앱 App ID 선택 → `.p8` 다운로드, Key ID 확인 (`.p8`은 한 번만 받을 수 있다)
+2. Secrets 등록 — `supabase/functions/.env.example`을 `supabase/functions/.env`로 복사해 채운 뒤 (`.env`는 커밋되지 않음)
+   ```bash
+   supabase login
+   supabase link --project-ref <프로젝트 ref>
+   supabase secrets set --env-file supabase/functions/.env
+   supabase functions deploy delete-account
+   ```
+   | Secret | 값 |
+   |---|---|
+   | `APPLE_TEAM_ID` | Apple Developer 팀 ID |
+   | `APPLE_KEY_ID` | 1번 키의 Key ID |
+   | `APPLE_PRIVATE_KEY` | `.p8` 파일 내용 전체 (한 줄로 넣을 때 줄바꿈은 `\n`) |
+   | `APPLE_CLIENT_ID` | 앱 번들 ID (`<BUNDLE_ID_PREFIX>.subhelp`) |
+
+   `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`는 Supabase가 함수에 자동으로 넣어준다.
 
 ### 동기화 방식
 
@@ -80,9 +113,6 @@ open Subhelp.xcodeproj
 - 삭제는 서버 행을 바로 지우지 않고 `deleted_at`을 남겨(tombstone) 다른 기기에도 전파
 - 시점: 로그인 직후, 앱 실행·복귀, 구독 변경 1.5초 후(연속 수정은 묶음)
 - 수정 시각은 서버 정밀도(밀리초)에 맞춰 저장 — 맞추지 않으면 매번 "기기가 최신"으로 판단돼 업로드가 반복된다
-
-이 값들은 `Info.plist`(`AppGroupIdentifier` 등)와 entitlements에 주입되고, 코드에서는 `AppConfig`로만 읽는다.
-App Group이 비어 있으면 앱은 앱 전용 저장소로 동작한다(위젯과 데이터 공유 안 됨).
 
 ## 구조
 
@@ -98,7 +128,7 @@ Subhelp/
 SubhelpWidget/      위젯 익스텐션
 SubhelpTests/       Domain 단위 테스트
 Config/             빌드 변수 (xcconfig)
-supabase/           DB 스키마 (migrations)
+supabase/           DB 스키마 (migrations), Edge Function (functions/delete-account)
 ```
 
 위젯 타깃은 `Domain/`, `Data/`, `Shared/`, `ModelContainer+Shared.swift`, `AppConfig.swift`를 함께 컴파일한다 (`project.yml`에 명시 — Target Membership 누락으로 인한 빌드 에러 방지).
@@ -128,24 +158,60 @@ xcodebuild test -project Subhelp.xcodeproj -scheme Subhelp \
   -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO
 ```
 
-테스트 타깃은 앱을 호스트로 띄우지 않고 `Domain/` 소스를 직접 컴파일한다 (서명·App Group 없이 실행 가능). GitHub Actions(`.github/workflows/ci.yml`)에서 앱·위젯 빌드와 테스트를 자동 실행한다.
+테스트 타깃은 앱을 호스트로 띄우지 않고 `Domain/` 소스를 직접 컴파일한다 (서명·App Group 없이 실행 가능). GitHub Actions(`.github/workflows/ci.yml`)에서 앱·위젯 빌드와 테스트, Edge Function 타입 체크(`deno check`·`lint`·`fmt`)를 자동 실행한다.
 
 ## 출시 전 체크리스트
 
-- [ ] `Config/Local.xcconfig` 값 채우기, Developer 포털에서 App ID·App Group 생성
-- [ ] 앱 아이콘 1024px (+ 다크/틴트 변형) → `Assets.xcassets/AppIcon`
-- [ ] 개인정보처리방침 페이지 (Notion 공개 페이지 / GitHub Pages)
-- [ ] App Store Connect: 앱 이름·부제·키워드, 6.9인치 스크린샷
-- [ ] 개인정보 라벨: 로그인 사용 시 **이메일 주소, 사용자 ID, 기타 금융 정보(구독 금액)** — 사용자와 연결됨, 추적 안 함, 목적: 앱 기능 (`PrivacyInfo.xcprivacy`와 동일)
-- [ ] 개인정보처리방침에 Supabase 저장·계정 삭제 방법 기재
-- [ ] Supabase 설정 완료 (위 섹션)
-- [ ] 실기기에서 알림 수신·위젯 갱신 확인, TestFlight 크래시 로그 확인
+### 1. 계정·포털 준비
+- [ ] Apple Developer Program 가입 (연 $99)
+- [ ] Identifiers > **App Groups**: `group.<prefix>.subhelp` 생성
+- [ ] Identifiers > **App ID** 2개: 앱 `<prefix>.subhelp`, 위젯 `<prefix>.subhelp.widget`
+  - [ ] 두 App ID 모두 **App Groups** 체크 후 위 그룹 연결
+  - [ ] 앱 App ID에만 **Sign in with Apple** 체크
+- [ ] Keys > Sign in with Apple 키 발급 (`.p8`, Key ID) — Edge Function용
+
+### 2. 프로젝트 설정
+- [ ] `brew install xcodegen`
+- [ ] `cp Config/Local.xcconfig.example Config/Local.xcconfig` 후 값 채우기
+  - [ ] `DEVELOPMENT_TEAM`, `BUNDLE_ID_PREFIX`, `APP_GROUP_ID`
+  - [ ] `SUPPORT_EMAIL`, `PRIVACY_POLICY_URL`
+  - [ ] `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+- [ ] `xcodegen generate` (`project.yml`이 바뀔 때마다 다시 실행, 첫 실행 시 Supabase 패키지 다운로드)
+- [ ] 앱 아이콘 1024px (+ 다크/틴트 변형) → `Subhelp/Resources/Assets.xcassets/AppIcon` — **없으면 업로드가 거절된다**
+
+### 3. Supabase
+- [ ] 프로젝트 생성, SQL Editor에서 `supabase/migrations/0001_init.sql` 실행
+- [ ] Authentication > Providers > Apple 활성화, Client IDs에 앱 번들 ID
+- [ ] Edge Function Secrets 등록 + `supabase functions deploy delete-account` (위 섹션)
+
+### 4. 개인정보
+- [ ] 개인정보처리방침 페이지 작성·공개 (Notion 공개 페이지 / GitHub Pages) → URL을 `PRIVACY_POLICY_URL`에
+  - [ ] 로그인 시 Supabase에 저장되는 항목(이메일, 사용자 ID, 구독 정보), 계정 삭제 방법(설정 > 계정·동기화 > 계정 삭제) 기재
+- [ ] App Store Connect 개인정보 라벨: **이메일 주소, 사용자 ID, 기타 금융 정보(구독 금액)** — 사용자와 연결됨, 추적 안 함, 목적: 앱 기능 (`PrivacyInfo.xcprivacy`와 동일)
+
+### 5. 실기기 확인 (CI로 확인할 수 없는 것)
+- [ ] 알림이 설정한 날짜·시각에 오는지, 알림을 탭하면 해당 구독 상세로 가는지
+- [ ] 앱에서 바꾼 내용이 위젯에 바로 반영되는지 (App Group 설정 확인), 위젯 탭 시 해당 화면 이동
+- [ ] 첫 실행 온보딩, 첫 구독 추가 직후 알림 권한 안내, 권한 거부 시 홈 배너
+- [ ] 통계 탭, 결제 캘린더, 목록 정렬·필터
+- [ ] 로그인·동기화: 기기 2대(또는 기기 + 시뮬레이터)에서 추가·수정·삭제가 서로 반영되는지
+- [ ] 로그아웃, 계정 삭제(Apple 재확인 → 삭제 → 함수 로그에서 `appleTokenRevoked: true` 확인)
+- [ ] 다크 모드, 큰 글씨(Dynamic Type)
+
+### 6. TestFlight
+- [ ] App Store Connect에서 같은 번들 ID로 앱 등록
+- [ ] Xcode > Product > Archive > Distribute App > App Store Connect 업로드 (두 번째부터 `project.yml`의 `CURRENT_PROJECT_VERSION` +1)
+- [ ] 내부 테스터 추가 (외부 테스터는 베타 심사 필요), TestFlight 크래시 로그 확인
+
+### 7. App Store 심사 제출
+- [ ] 앱 이름·부제·키워드·설명·카테고리(금융)·연령 등급
+- [ ] 6.9인치 iPhone 스크린샷
+- [ ] 앱 소개에 "각 서비스명은 해당 회사의 상표입니다" 문구
 
 ## 로드맵 (MVP 이후)
 
-1. 계정 삭제 시 Apple 토큰 철회 (Supabase Edge Function + Sign in with Apple REST API)
-2. 인터랙티브 위젯 (App Intents)
-3. 무료체험 종료 Live Activity
-4. 실시간 환율 API + 캐싱
-5. 서비스별 해지 링크 모음
-6. (선택) 서버 — 프리셋 원격 관리, 가족 요금제 공유
+1. 인터랙티브 위젯 (App Intents)
+2. 무료체험 종료 Live Activity
+3. 실시간 환율 API + 캐싱
+4. 서비스별 해지 링크 모음
+5. 공유 구독(가족 요금제 N빵) — Supabase 위에 확장
