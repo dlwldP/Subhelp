@@ -27,11 +27,17 @@ struct InsightCalculator {
 
     /// 해당 월의 모든 유료 결제 (날짜순)
     func payments(in month: Date, of plans: [BillingPlan]) -> [ScheduledPayment] {
-        plans.enumerated()
-            .flatMap { index, plan in
-                billing.paymentDates(in: month, plan).map { ScheduledPayment(planIndex: index, date: $0) }
+        var result: [ScheduledPayment] = []
+        for (index, plan) in plans.enumerated() {
+            for date in billing.paymentDates(in: month, plan) {
+                result.append(ScheduledPayment(planIndex: index, date: date))
             }
-            .sorted { $0.date == $1.date ? $0.planIndex < $1.planIndex : $0.date < $1.date }
+        }
+        result.sort { (lhs: ScheduledPayment, rhs: ScheduledPayment) -> Bool in
+            if lhs.date != rhs.date { return lhs.date < rhs.date }
+            return lhs.planIndex < rhs.planIndex
+        }
+        return result
     }
 
     /// 날짜(자정 기준)별 결제 묶음
@@ -41,18 +47,24 @@ struct InsightCalculator {
 
     /// 해당 월 결제 예정 총액 (원화 환산)
     func total(of payments: [ScheduledPayment], plans: [BillingPlan]) -> Decimal {
-        payments.reduce(Decimal(0)) { sum, payment in
+        var sum: Decimal = 0
+        for payment in payments {
             let plan = plans[payment.planIndex]
-            return sum + cost.toKRW(plan.price, currency: plan.currency)
+            sum += cost.toKRW(plan.price, currency: plan.currency)
         }
+        return sum
     }
 
     /// 월 환산 금액이 큰 순 (체험 중 제외)
     func ranking(of plans: [BillingPlan], reference: Date = .now, limit: Int? = nil) -> [RankedPlan] {
-        let ranked = plans.enumerated()
-            .filter { !billing.isInTrial($0.element, on: reference) }
-            .map { RankedPlan(planIndex: $0.offset, monthlyCost: cost.monthlyCost($0.element)) }
-            .sorted { $0.monthlyCost == $1.monthlyCost ? $0.planIndex < $1.planIndex : $0.monthlyCost > $1.monthlyCost }
+        var ranked: [RankedPlan] = []
+        for (index, plan) in plans.enumerated() where !billing.isInTrial(plan, on: reference) {
+            ranked.append(RankedPlan(planIndex: index, monthlyCost: cost.monthlyCost(plan)))
+        }
+        ranked.sort { (lhs: RankedPlan, rhs: RankedPlan) -> Bool in
+            if lhs.monthlyCost != rhs.monthlyCost { return lhs.monthlyCost > rhs.monthlyCost }
+            return lhs.planIndex < rhs.planIndex
+        }
         guard let limit else { return ranked }
         return Array(ranked.prefix(limit))
     }
@@ -60,14 +72,16 @@ struct InsightCalculator {
     /// 1년 이상 주기로 갱신되는 결제 중 `days`일 이내(오늘 포함) 예정인 것
     func upcomingRenewals(of plans: [BillingPlan], within days: Int = 30,
                           reference: Date = .now) -> [ScheduledPayment] {
-        plans.enumerated()
-            .filter { Self.isAnnual($0.element) }
-            .compactMap { index, plan in
-                let next = billing.nextPaymentDate(plan, from: reference)
-                let remaining = billing.daysUntil(next, from: reference)
-                return (0...days).contains(remaining) ? ScheduledPayment(planIndex: index, date: next) : nil
+        var result: [ScheduledPayment] = []
+        for (index, plan) in plans.enumerated() where Self.isAnnual(plan) {
+            let next = billing.nextPaymentDate(plan, from: reference)
+            let remaining = billing.daysUntil(next, from: reference)
+            if (0...days).contains(remaining) {
+                result.append(ScheduledPayment(planIndex: index, date: next))
             }
-            .sorted { $0.date < $1.date }
+        }
+        result.sort { (lhs: ScheduledPayment, rhs: ScheduledPayment) -> Bool in lhs.date < rhs.date }
+        return result
     }
 
     /// 카테고리별 월 환산 합계, 큰 순 (체험 중 제외)
@@ -76,9 +90,12 @@ struct InsightCalculator {
         for item in items where !billing.isInTrial(item.plan, on: reference) {
             totals[item.category, default: 0] += cost.monthlyCost(item.plan)
         }
-        return totals
-            .map { CategoryTotal(category: $0.key, monthlyCost: $0.value) }
-            .sorted { $0.monthlyCost == $1.monthlyCost ? $0.category < $1.category : $0.monthlyCost > $1.monthlyCost }
+        var result: [CategoryTotal] = totals.map { CategoryTotal(category: $0.key, monthlyCost: $0.value) }
+        result.sort { (lhs: CategoryTotal, rhs: CategoryTotal) -> Bool in
+            if lhs.monthlyCost != rhs.monthlyCost { return lhs.monthlyCost > rhs.monthlyCost }
+            return lhs.category < rhs.category
+        }
+        return result
     }
 
     /// 연결제, 또는 12개월 이상 간격의 월결제

@@ -179,9 +179,11 @@ extension SubscriptionSortOrder {
         let byName = lhs.subscription.name.localizedStandardCompare(rhs.subscription.name) == .orderedAscending
         switch self {
         case .nextPayment:
-            return lhs.nextDate == rhs.nextDate ? byName : lhs.nextDate < rhs.nextDate
+            if lhs.nextDate != rhs.nextDate { return lhs.nextDate < rhs.nextDate }
+            return byName
         case .amount:
-            return lhs.monthlyCost == rhs.monthlyCost ? byName : lhs.monthlyCost > rhs.monthlyCost
+            if lhs.monthlyCost != rhs.monthlyCost { return lhs.monthlyCost > rhs.monthlyCost }
+            return byName
         case .name:
             return byName
         }
