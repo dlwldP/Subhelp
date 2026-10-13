@@ -1,6 +1,7 @@
 # Subhelp — 구독 관리 iOS 앱
 
-구독 결제일 알림과 지출 관리를 위한 iOS 앱. **서버 없이 로컬 우선(SwiftData)** 으로 만들고, 동기화·서버는 MVP 이후에 붙인다.
+**흩어진 구독 결제를 한곳에 모아, 언제·얼마가 빠져나가는지 미리 알려주는 앱.**
+계정·서버 없이 로컬 우선(SwiftData)으로 동작하고, 동기화는 MVP 이후에 붙인다.
 
 | 항목 | 결정 |
 |---|---|
@@ -13,14 +14,20 @@
 | 테스트 | Swift Testing (Domain 레이어) |
 | 프로젝트 | XcodeGen (`project.yml`) |
 
-## 기능 (MVP)
+## 기능 (MVP 1 — 첫 출시 기준선)
 
-- 구독 추가 / 수정 / 삭제 — 이름, 금액, 통화(KRW/USD), 주기(주/월/년 + 간격), 최초 결제일, 카테고리, 색상, 메모
-- 구독 목록 — 다음 결제일 가까운 순, D-day, 스와이프 삭제·일시중지, 활성/비활성 세그먼트
-- 홈 — 이번 달 결제 예정 금액, 남은 결제, 월 환산 평균, 연 환산, 7일 이내 결제, 카테고리 도넛 차트
-- 결제일 알림 — 구독별 당일/1일/3일/7일 전 (오전 9시), 무료체험 종료 하루 전 알림
-- 홈 화면·잠금화면 위젯
-- 프리셋 (이름·카테고리만, 로고·가격 없음)
+**Core**
+- 구독 등록·수정·삭제 — 프리셋(이름·카테고리·색상만, 로고·가격 없음) 또는 직접 입력. 필수 항목은 위, 선택 항목은 "더보기"
+- 구독 목록 — 다음 결제일 가까운 순, D-day 배지(오늘·내일 오렌지 / 7일 이내 블루 / 그 외 회색), 왼쪽 스와이프 삭제(확인), 오른쪽 스와이프 일시중지
+- 구독 상세 — 다음 결제일, 월 환산, 지금까지 낸 총액(추정), 알림 설정, 편집·일시중지·삭제
+- 홈 — 이번 달 결제 예정액, 남은 결제, 월·연 환산, 다가오는 결제(7일, 최대 5건 + 더보기), 체험 중인 구독, 카테고리 차트
+
+**Notify**
+- 결제 알림 — 구독별 당일/1/3/7일 전/끔, 알림 시각 설정(기본 오전 9시)
+- 무료체험 — 종료 3일 전·1일 전 알림, "체험 중" 배지, 종료 전까지 합계에서 제외
+- 위젯 — 홈 소형(결제 예정액·남은 건수), 중형(+ 다가오는 결제 3건), 잠금화면(다음 결제 1건), 탭하면 해당 화면으로 이동(`subhelp://`)
+- 온보딩 2장, 첫 구독 등록 직후 알림 권한 안내, 권한 거부 시 홈 배너
+- 설정 — 기본 통화, 달러 환율(환산 금액에 ≈ 표시), 알림 기본값·시각, 권한 상태, 문의, 개인정보처리방침
 
 ## 시작하기
 
@@ -28,7 +35,7 @@
 brew install xcodegen
 cp Config/Local.xcconfig.example Config/Local.xcconfig   # 값 채우기 (아래 참고)
 xcodegen generate
-open SubTracker.xcodeproj
+open Subhelp.xcodeproj
 ```
 
 ### 직접 채워야 하는 값 — `Config/Local.xcconfig`
@@ -38,8 +45,8 @@ open SubTracker.xcodeproj
 | 변수 | 설명 |
 |---|---|
 | `DEVELOPMENT_TEAM` | Apple Developer 팀 ID |
-| `BUNDLE_ID_PREFIX` | 번들 ID 접두사 (예: `com.yourname`) → 앱 `<prefix>.subtracker`, 위젯 `<prefix>.subtracker.widget` |
-| `APP_GROUP_ID` | App Group ID (예: `group.com.yourname.subtracker`). Developer 포털에서 생성 후 앱·위젯 App ID 둘 다에 연결 |
+| `BUNDLE_ID_PREFIX` | 번들 ID 접두사 (예: `com.yourname`) → 앱 `<prefix>.subhelp`, 위젯 `<prefix>.subhelp.widget` |
+| `APP_GROUP_ID` | App Group ID (예: `group.com.yourname.subhelp`). Developer 포털에서 생성 후 앱·위젯 App ID 둘 다에 연결 |
 | `SUPPORT_EMAIL` | 설정 > 문의하기 (비우면 숨김) |
 | `PRIVACY_POLICY_URL` | 설정 > 개인정보처리방침 (비우면 숨김). xcconfig에서 `//`는 주석이라 `https:/$()/example.com` 형태로 적는다 |
 
@@ -49,16 +56,16 @@ App Group이 비어 있으면 앱은 앱 전용 저장소로 동작한다(위젯
 ## 구조
 
 ```
-SubTracker/
-├── App/            앱 진입점, 공유 ModelContainer, AppConfig
-├── Domain/         순수 로직 (UI·SwiftData 의존 X) — 테스트 대상
-├── Data/           Subscription (@Model)
+Subhelp/
+├── App/            앱 진입점, AppRouter(탭·딥링크·권한 안내), 공유 ModelContainer, AppConfig
+├── Domain/         결제일·금액 계산 (순수 로직, UI·SwiftData 의존 X) — 테스트 대상
+├── Data/           Subscription (@Model), 프리셋·카테고리
 ├── Services/       NotificationService, SubscriptionSync (저장 → 알림 재예약 → 위젯 갱신)
-├── Features/       Dashboard / SubscriptionList / SubscriptionEditor / Settings
-├── Shared/         공용 컴포넌트·확장·설정 (위젯과 공유)
-└── Resources/      Assets, Info.plist, entitlements, PrivacyInfo
-SubscriptionWidget/ 위젯 익스텐션
-SubTrackerTests/    Domain 단위 테스트
+├── Features/       Home / SubscriptionList / Detail / Editor / Settings / Onboarding
+├── Shared/         공용 컴포넌트·포매터·설정·딥링크 (위젯과 공유)
+└── Resources/      Assets, Info.plist, entitlements, PrivacyInfo, Localizable.xcstrings
+SubhelpWidget/      위젯 익스텐션
+SubhelpTests/       Domain 단위 테스트
 Config/             빌드 변수 (xcconfig)
 ```
 
@@ -72,6 +79,8 @@ Config/             빌드 변수 (xcconfig)
   - 계산 로직 → `Domain/`의 순수 struct (`BillingPlan` 값 타입으로 SwiftData와 분리) → 단위 테스트
   - 부수효과 → `Services/`
   - 편집 폼처럼 복잡한 화면 상태만 `@Observable` (`SubscriptionDraft`)
+- **다음 결제일·월 환산은 저장하지 않고 계산** — 데이터 불일치 방지.
+- **무료체험** — 체험 종료일 이전 결제일은 결제로 치지 않는다(종료일 당일부터 유료). 체험 중 구독은 월·연 환산에서도 제외.
 - **금액은 Decimal** — Double 부동소수 오차 방지. 환율 입력(Double)도 문자열을 거쳐 Decimal로 변환.
 
 ## 트러블슈팅 기록
@@ -83,7 +92,7 @@ Config/             빌드 변수 (xcconfig)
 ## 테스트
 
 ```bash
-xcodebuild test -project SubTracker.xcodeproj -scheme SubTracker \
+xcodebuild test -project Subhelp.xcodeproj -scheme Subhelp \
   -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO
 ```
 

@@ -1,6 +1,6 @@
-# XcodeGen 프로젝트 정의 — `xcodegen generate`로 SubTracker.xcodeproj를 만든다.
+# XcodeGen 프로젝트 정의 — `xcodegen generate`로 Subhelp.xcodeproj를 만든다.
 # 개인 값(팀 ID, 번들 ID, App Group 등)은 Config/Local.xcconfig에서 채운다. (README 참고)
-name: SubTracker
+name: Subhelp
 
 options:
   deploymentTarget:
@@ -19,62 +19,65 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # String Catalog(Localizable.xcstrings)로 문자열을 추출한다
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
 
 targets:
-  SubTracker:
+  Subhelp:
     type: application
     platform: iOS
     sources:
-      - path: SubTracker
+      - path: Subhelp
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).subtracker
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).subhelp
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_FILE: SubTracker/Resources/Info.plist
-        INFOPLIST_KEY_CFBundleDisplayName: 구독관리
+        INFOPLIST_FILE: Subhelp/Resources/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: Subhelp
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.finance
-        CODE_SIGN_ENTITLEMENTS: SubTracker/Resources/SubTracker.entitlements
+        CODE_SIGN_ENTITLEMENTS: Subhelp/Resources/Subhelp.entitlements
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     dependencies:
-      - target: SubscriptionWidget
+      - target: SubhelpWidget
     scheme:
       testTargets:
-        - SubTrackerTests
+        - SubhelpTests
 
-  SubscriptionWidget:
+  SubhelpWidget:
     type: app-extension
     platform: iOS
     sources:
-      - path: SubscriptionWidget
+      - path: SubhelpWidget
       # 위젯과 공유하는 코드 (Target Membership: 앱 + 위젯)
-      - path: SubTracker/Domain
-      - path: SubTracker/Data
-      - path: SubTracker/Shared
-      - path: SubTracker/App/ModelContainer+Shared.swift
-      - path: SubTracker/App/AppConfig.swift
+      - path: Subhelp/Domain
+      - path: Subhelp/Data
+      - path: Subhelp/Shared
+      - path: Subhelp/App/ModelContainer+Shared.swift
+      - path: Subhelp/App/AppConfig.swift
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).subtracker.widget
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).subhelp.widget
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_FILE: SubscriptionWidget/Info.plist
-        INFOPLIST_KEY_CFBundleDisplayName: 구독관리 위젯
-        CODE_SIGN_ENTITLEMENTS: SubscriptionWidget/SubscriptionWidget.entitlements
+        INFOPLIST_FILE: SubhelpWidget/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: Subhelp
+        CODE_SIGN_ENTITLEMENTS: SubhelpWidget/SubhelpWidget.entitlements
         CODE_SIGN_STYLE: Automatic
         SKIP_INSTALL: YES
 
   # 순수 Domain 로직만 테스트한다. 앱을 호스트로 띄우지 않아서(App Group 서명 불필요) CI에서도 돈다.
-  SubTrackerTests:
+  SubhelpTests:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: SubTrackerTests
-      - path: SubTracker/Domain
+      - path: SubhelpTests
+      - path: Subhelp/Domain
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).subtracker.tests
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).subhelp.tests
         GENERATE_INFOPLIST_FILE: YES

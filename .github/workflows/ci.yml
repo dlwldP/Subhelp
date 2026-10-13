@@ -39,11 +39,11 @@ jobs:
           ')
           set -o pipefail
           xcodebuild test \
-            -project SubTracker.xcodeproj \
-            -scheme SubTracker \
+            -project Subhelp.xcodeproj \
+            -scheme Subhelp \
             -destination "id=$DEVICE_ID" \
             CODE_SIGNING_ALLOWED=NO \
-            | tee xcodebuild.log | grep -E "error:|warning: .*SubTracker|Test (Suite|Case)|✔|✘|\*\* (BUILD|TEST)" || true
+            | tee xcodebuild.log | grep -E "error:|warning: .*Subhelp|Test (Suite|Case)|✔|✘|\*\* (BUILD|TEST)" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" xcodebuild.log || { tail -150 xcodebuild.log; exit 1; }
 
       - name: Upload log

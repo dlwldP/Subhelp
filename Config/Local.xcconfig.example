@@ -2,7 +2,7 @@
 
 DEVELOPMENT_TEAM = YOUR_TEAM_ID
 BUNDLE_ID_PREFIX = com.yourname
-APP_GROUP_ID = group.com.yourname.subtracker
+APP_GROUP_ID = group.com.yourname.subhelp
 
 SUPPORT_EMAIL = you@example.com
 PRIVACY_POLICY_URL = https:/$()/your-privacy-policy-page.example.com
