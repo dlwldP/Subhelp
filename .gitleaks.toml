@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "자리표시자만 있는 예시 파일"
+paths = ['''\.env\.example$''']
